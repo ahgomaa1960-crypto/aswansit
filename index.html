@@ -1,0 +1,1025 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>مجمع الملفات الذكي إلى PDF و Word</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts - Cairo & Amiri for formal Word-like typography -->
+    <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700;900&display=swap" rel="stylesheet">
+    <!-- jsPDF and html2canvas for PDF Export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- Mammoth.js for Word (.docx) & JSZip for PowerPoint (.pptx) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        body {
+            font-family: 'Cairo', sans-serif;
+        }
+        /* Word-like Document Typography & Layout */
+        .word-sheet-typography {
+            font-family: 'Cairo', 'Traditional Arabic', Arial, sans-serif;
+            color: #1e293b;
+        }
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col justify-between">
+
+    <!-- Header / Navbar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="w-12 h-12 bg-gradient-to-tr from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                    <i class="fa-solid fa-file-contract text-2xl"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold text-slate-900">مجمع الملفات الذكي</h1>
+                    <p class="text-xs text-slate-500">اجمع صورك ونصوصك وملفاتك في ملف PDF أو Word موحد ومنسق</p>
+                </div>
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+                <button onclick="clearAllFiles()" class="px-3.5 py-2 text-sm font-medium text-red-600 bg-red-50 hover:bg-red-100 rounded-xl transition-all flex items-center gap-2">
+                    <i class="fa-solid fa-trash-can"></i> حذف الكل
+                </button>
+                <button onclick="triggerExportWord()" id="exportWordBtn" class="px-5 py-2.5 text-sm font-bold text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl transition-all shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fa-solid fa-file-word text-base"></i> تصدير إلى Word
+                </button>
+                <button onclick="triggerExportPDF()" id="exportBtn" class="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 rounded-xl transition-all shadow-lg shadow-blue-500/25 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+                    <i class="fa-solid fa-file-pdf text-base"></i> تصدير إلى PDF
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto px-4 py-8 w-full flex-grow grid grid-cols-1 lg:grid-cols-12 gap-8">
+        
+        <!-- Left Column: Controls & File Queue (5 Cols) -->
+        <div class="lg:col-span-5 flex flex-col gap-6">
+            
+            <!-- Dropzone Box -->
+            <div class="bg-white border-2 border-dashed border-slate-300 hover:border-blue-500 rounded-3xl p-8 text-center transition-all cursor-pointer relative group bg-slate-50/50" id="dropzone">
+                <input type="file" id="fileInput" multiple accept="image/*,.txt,.json,.csv,.docx,.pptx" class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10">
+                <div class="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4 group-hover:scale-110 transition-transform">
+                    <i class="fa-solid fa-cloud-arrow-up text-3xl"></i>
+                </div>
+                <h3 class="text-lg font-bold text-slate-800 mb-1">اختر الملفات أو اسحبها هنا</h3>
+                <p class="text-xs text-slate-500 mb-4">يدعم الصور، النصوص، وملفات Word (.docx) و PowerPoint (.pptx)</p>
+                <span class="inline-block px-4 py-2 bg-blue-600 text-white text-xs font-semibold rounded-xl shadow-sm">تصفح الجهاز</span>
+            </div>
+
+            <!-- Document Options Card -->
+            <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-4">
+                <h2 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                    <i class="fa-solid fa-sliders text-blue-600"></i> إعدادات المستند
+                </h2>
+                <div>
+                    <label class="block text-xs font-semibold text-slate-600 mb-1.5">عنوان المستند (يظهر في رأس الصفحات)</label>
+                    <input type="text" id="docTitle" value="تقرير الملفات المجمعة" class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">حجم الصفحة</label>
+                        <select id="pageSize" class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                            <option value="a4">A4</option>
+                            <option value="letter">Letter</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">حجم الخط للنصوص</label>
+                        <select id="fontSize" class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                            <option value="15px">متوسط (15px)</option>
+                            <option value="13px">صغير (13px)</option>
+                            <option value="17px">كبير (17px)</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1.5">تباعد الأسطر</label>
+                        <select id="lineHeight" class="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500">
+                            <option value="1.8">مريح (1.8)</option>
+                            <option value="1.5">عادي (1.5)</option>
+                            <option value="2.1">واسع (2.1)</option>
+                        </select>
+                    </div>
+                    <div class="flex items-end pb-1">
+                        <label class="flex items-center gap-2.5 cursor-pointer select-none bg-slate-50 border border-slate-200 px-3.5 py-2.5 rounded-xl w-full hover:border-blue-400 transition-colors">
+                            <input type="checkbox" id="separateImagePages" checked class="w-4 h-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500">
+                            <span class="text-xs font-semibold text-slate-700">كل صورة في ورقة مستقلة</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Uploaded Files List -->
+            <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col gap-4 flex-grow">
+                <div class="flex justify-between items-center">
+                    <h2 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-layer-group text-blue-600"></i> الملفات المرفوعة <span id="fileCountBadge" class="bg-blue-100 text-blue-700 text-xs px-2 py-0.5 rounded-full">0</span>
+                    </h2>
+                </div>
+                
+                <div id="fileListContainer" class="flex flex-col gap-3 max-h-[350px] overflow-y-auto pr-1">
+                    <!-- Empty State -->
+                    <div id="emptyFilesState" class="py-12 text-center text-slate-400 flex flex-col items-center justify-center gap-2">
+                        <i class="fa-solid fa-folder-open text-3xl text-slate-300"></i>
+                        <p class="text-sm">لم يتم رفع أي ملفات بعد</p>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Right Column: Live PDF Preview (7 Cols) -->
+        <div class="lg:col-span-7 flex flex-col">
+            <div class="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm flex flex-col h-full">
+                <div class="flex justify-between items-center mb-4 pb-3 border-b border-slate-100">
+                    <h2 class="font-bold text-slate-800 text-base flex items-center gap-2">
+                        <i class="fa-solid fa-eye text-blue-600"></i> معاينة المستند المدمج
+                    </h2>
+                    <span class="text-xs text-slate-400 bg-slate-100 px-3 py-1 rounded-full">تحديث فوري</span>
+                </div>
+
+                <!-- Preview Sheet Scroll Area -->
+                <div id="previewScrollContainer" class="bg-slate-200/70 rounded-2xl p-4 sm:p-6 overflow-y-auto flex-grow flex justify-center max-h-[750px] relative">
+                    
+                    <!-- Paper Sheets Container -->
+                    <div id="pdfPreviewArea" class="w-full max-w-[650px] flex flex-col gap-6 text-slate-800 transition-all">
+                        
+                        <!-- Initial Placeholder Sheet -->
+                        <div class="pdf-sheet word-sheet-typography bg-white w-full min-h-[880px] shadow-xl rounded-sm border border-slate-200/80 px-10 py-12 sm:px-14 sm:py-14 flex flex-col justify-between">
+                            <div>
+                                <div class="border-b-2 border-slate-300 pb-3 mb-8 flex justify-between items-end">
+                                    <div>
+                                        <h2 class="text-xl font-bold text-slate-900">تقرير الملفات المجمعة</h2>
+                                        <p class="text-xs text-slate-500 mt-1" id="previewDateStr"></p>
+                                    </div>
+                                    <span class="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded">تنسيق مستند قياسي</span>
+                                </div>
+                                <div class="text-center py-28 text-slate-400 flex flex-col items-center gap-3">
+                                    <i class="fa-solid fa-file-circle-plus text-4xl text-slate-300"></i>
+                                    <p class="text-sm">قم بإضافة ملفات من القائمة الجانبية لبدء الدمج والمعاينة</p>
+                                </div>
+                            </div>
+                            <div class="border-t border-slate-200 pt-3 mt-8 flex justify-between items-center text-xs text-slate-500">
+                                <span>مجمع الملفات الذكي</span>
+                                <span>صفحة 1</span>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        <p>جميع الحقوق محفوظة &copy; 2026 - مجمع الملفات الذكي إلى PDF و Word</p>
+    </footer>
+
+    <!-- Toast Notification System -->
+    <div id="toast" class="fixed bottom-6 left-6 transform translate-y-24 opacity-0 transition-all duration-300 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 z-50 text-sm">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-lg"></i>
+        <span id="toastMessage">تمت العملية بنجاح</span>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        let uploadedFiles = [];
+
+        // DOM Elements
+        const fileInput = document.getElementById('fileInput');
+        const fileListContainer = document.getElementById('fileListContainer');
+        const emptyFilesState = document.getElementById('emptyFilesState');
+        // Extract PowerPoint (.pptx) slides text, tables, notes & embedded images (including NotebookLM decks)
+        async function readPptxSlides(file) {
+            const arrayBuffer = await readAsArrayBuffer(file);
+            const zip = await JSZip.loadAsync(arrayBuffer);
+            const slideFiles = Object.keys(zip.files).filter(name => /^ppt\/slides\/slide\d+\.xml$/.test(name));
+
+            // Sort slides numerically (slide1, slide2, ..., slide10)
+            slideFiles.sort((a, b) => {
+                const numA = parseInt(a.match(/slide(\d+)\.xml/)[1], 10);
+                const numB = parseInt(b.match(/slide(\d+)\.xml/)[1], 10);
+                return numA - numB;
+            });
+
+            if (slideFiles.length === 0) {
+                return [{ slideNumber: 1, paragraphs: ['لم يتم العثور على شرائح نصية في العرض التقديمي.'], tables: [], images: [], notes: [] }];
+            }
+
+            const slidesData = [];
+            const parser = new DOMParser();
+
+            // Helper to extract all text runs inside any XML node (handles nested DrawingML, SmartArt, etc.)
+            const extractTextFromNode = (node) => {
+                const textNodes = node.getElementsByTagNameNS('*', 't');
+                let combined = '';
+                for (let t of textNodes) {
+                    combined += t.textContent;
+                }
+                return combined.trim();
+            };
+
+            // Helper to convert image file inside zip to Data URL
+            const getZipImageDataUrl = async (targetPath) => {
+                const normalizedPath = targetPath.replace(/^\/+/, '');
+                const zipEntry = zip.files[normalizedPath];
+                if (!zipEntry) return null;
+                const ext = normalizedPath.split('.').pop().toLowerCase();
+                const mimeMap = {
+                    'png': 'image/png',
+                    'jpg': 'image/jpeg',
+                    'jpeg': 'image/jpeg',
+                    'gif': 'image/gif',
+                    'webp': 'image/webp',
+                    'svg': 'image/svg+xml',
+                    'bmp': 'image/bmp'
+                };
+                const mime = mimeMap[ext] || 'image/png';
+                const base64 = await zipEntry.async('base64');
+                return `data:${mime};base64,${base64}`;
+            };
+
+            for (let i = 0; i < slideFiles.length; i++) {
+                const slidePath = slideFiles[i];
+                const slideNumMatch = slidePath.match(/slide(\d+)\.xml/);
+                const slideNum = slideNumMatch ? slideNumMatch[1] : (i + 1);
+                const xmlText = await zip.files[slidePath].async('text');
+                const xmlDoc = parser.parseFromString(xmlText, 'application/xml');
+
+                // 1. Extract Tables (<a:tbl>) separately so they render cleanly without duplicating into paragraphs
+                const tables = [];
+                const tableTextElements = new Set();
+                const tblNodes = xmlDoc.getElementsByTagNameNS('*', 'tbl');
+                for (let tbl of tblNodes) {
+                    const rows = [];
+                    const trNodes = tbl.getElementsByTagNameNS('*', 'tr');
+                    for (let tr of trNodes) {
+                        const rowCells = [];
+                        const tcNodes = tr.getElementsByTagNameNS('*', 'tc');
+                        for (let tc of tcNodes) {
+                            const cellParas = [];
+                            const pInCell = tc.getElementsByTagNameNS('*', 'p');
+                            for (let p of pInCell) {
+                                const txt = extractTextFromNode(p);
+                                if (txt) cellParas.push(txt);
+                            }
+                            rowCells.push(cellParas.join(' '));
+                            // Mark all <t> inside this table so we don't duplicate them in general paragraphs
+                            const tInCell = tc.getElementsByTagNameNS('*', 't');
+                            for (let t of tInCell) tableTextElements.add(t);
+                        }
+                        if (rowCells.some(c => c !== '')) rows.push(rowCells);
+                    }
+                    if (rows.length > 0) tables.push(rows);
+                }
+
+                // 2. Extract all paragraphs (<a:p>) excluding table cells
+                const paragraphs = [];
+                const pNodes = xmlDoc.getElementsByTagNameNS('*', 'p');
+                for (let p of pNodes) {
+                    const tNodes = p.getElementsByTagNameNS('*', 't');
+                    let lineText = '';
+                    for (let t of tNodes) {
+                        if (!tableTextElements.has(t)) {
+                            lineText += t.textContent;
+                        }
+                    }
+                    const trimmed = lineText.trim();
+                    if (trimmed && (paragraphs.length === 0 || paragraphs[paragraphs.length - 1] !== trimmed)) {
+                        paragraphs.push(trimmed);
+                    }
+                }
+
+                // 3. Extract Speaker Notes & Embedded Images / SmartArt Diagrams via slide relationships (.rels)
+                const notes = [];
+                const images = [];
+                const relsPath = `ppt/slides/_rels/slide${slideNum}.xml.rels`;
+
+                if (zip.files[relsPath]) {
+                    const relsText = await zip.files[relsPath].async('text');
+                    const relsDoc = parser.parseFromString(relsText, 'application/xml');
+                    const relNodes = relsDoc.getElementsByTagName('Relationship');
+
+                    for (let rel of relNodes) {
+                        const type = rel.getAttribute('Type') || '';
+                        const target = rel.getAttribute('Target') || '';
+                        // Resolve relative path from ppt/slides/
+                        const resolvedTarget = target.startsWith('../')
+                            ? 'ppt/' + target.replace(/^(\.\.\/)+/, '')
+                            : (target.startsWith('ppt/') ? target : `ppt/slides/${target}`);
+
+                        // Check for Speaker Notes (NotebookLM often places rich explanations in notes)
+                        if (type.includes('/notesSlide') && zip.files[resolvedTarget]) {
+                            const notesXml = await zip.files[resolvedTarget].async('text');
+                            const notesDoc = parser.parseFromString(notesXml, 'application/xml');
+                            const notePNodes = notesDoc.getElementsByTagNameNS('*', 'p');
+                            for (let np of notePNodes) {
+                                const nText = extractTextFromNode(np);
+                                // Filter out slide number placeholders
+                                if (nText && !/^\d+$/.test(nText)) {
+                                    notes.push(nText);
+                                }
+                            }
+                        }
+
+                        // Check for SmartArt / Diagram data XML (NotebookLM visual diagrams)
+                        if (type.includes('/diagramData') && zip.files[resolvedTarget]) {
+                            const diagXml = await zip.files[resolvedTarget].async('text');
+                            const diagDoc = parser.parseFromString(diagXml, 'application/xml');
+                            const diagPNodes = diagDoc.getElementsByTagNameNS('*', 'p');
+                            for (let dp of diagPNodes) {
+                                const dText = extractTextFromNode(dp);
+                                if (dText && !paragraphs.includes(dText)) {
+                                    paragraphs.push(dText);
+                                }
+                            }
+                        }
+
+                        // Check for embedded images inside the slide (NotebookLM infographics / slide visuals)
+                        if (type.includes('/image') && zip.files[resolvedTarget]) {
+                            const imgDataUrl = await getZipImageDataUrl(resolvedTarget);
+                            if (imgDataUrl && !images.includes(imgDataUrl)) {
+                                images.push(imgDataUrl);
+                            }
+                        }
+                    }
+                }
+
+                slidesData.push({
+                    slideNumber: parseInt(slideNum, 10) || (i + 1),
+                    paragraphs: paragraphs,
+                    tables: tables,
+                    images: images,
+                    notes: notes
+                });
+            }
+
+            return slidesData;
+        }
+
+        function readAsDataURL(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+        }
+
+        function readAsText(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsText(file, 'UTF-8');
+            });
+        }
+
+        function formatBytes(bytes, decimals = 2) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+        }
+
+        // Remove file
+        window.removeFile = function(id) {
+            uploadedFiles = uploadedFiles.filter(f => f.id !== id);
+            updateUI();
+            showToast('تم حذف الملف', 'info');
+        }
+
+        // Move file up/down
+        window.moveFile = function(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= uploadedFiles.length) return;
+            const temp = uploadedFiles[index];
+            uploadedFiles[index] = uploadedFiles[newIndex];
+            uploadedFiles[newIndex] = temp;
+            updateUI();
+        }
+
+        function clearAllFiles() {
+            if (uploadedFiles.length === 0) return;
+            uploadedFiles = [];
+            updateUI();
+            showToast('تم مسح جميع الملفات', 'info');
+        }
+
+        function updateUI() {
+            fileCountBadge.innerText = uploadedFiles.length;
+            exportBtn.disabled = uploadedFiles.length === 0;
+            exportWordBtn.disabled = uploadedFiles.length === 0;
+
+            if (uploadedFiles.length === 0) {
+                emptyFilesState.style.display = 'flex';
+                fileListContainer.innerHTML = '';
+                fileListContainer.appendChild(emptyFilesState);
+                
+                const currentTitle = escapeHtml(docTitleInput.value.trim() || 'تقرير الملفات المجمعة');
+                pdfPreviewArea.innerHTML = `
+                    <div class="pdf-sheet word-sheet-typography bg-white w-full min-h-[880px] shadow-xl rounded-sm border border-slate-200/80 px-10 py-12 sm:px-14 sm:py-14 flex flex-col justify-between">
+                        <div>
+                            <div class="border-b-2 border-slate-300 pb-3 mb-8 flex justify-between items-end">
+                                <div>
+                                    <h2 class="text-xl font-bold text-slate-900">${currentTitle}</h2>
+                                    <p class="text-xs text-slate-500 mt-1">${formattedTodayDate}</p>
+                                </div>
+                                <span class="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded">تنسيق مستند قياسي</span>
+                            </div>
+                            <div class="text-center py-28 text-slate-400 flex flex-col items-center gap-3">
+                                <i class="fa-solid fa-file-circle-plus text-4xl text-slate-300"></i>
+                                <p class="text-sm">قم بإضافة ملفات من القائمة الجانبية لبدء الدمج والمعاينة</p>
+                            </div>
+                        </div>
+                        <div class="border-t border-slate-200 pt-3 mt-8 flex justify-between items-center text-xs text-slate-500">
+                            <span>مجمع الملفات الذكي</span>
+                            <span>صفحة 1</span>
+                        </div>
+                    </div>
+                `;
+                return;
+            }
+
+            emptyFilesState.style.display = 'none';
+            let listHTML = '';
+            uploadedFiles.forEach((item, index) => {
+                let iconClass = 'fa-file-lines text-slate-600';
+                if (item.category === 'image') iconClass = 'fa-file-image text-emerald-600';
+                else if (item.category === 'word') iconClass = 'fa-file-word text-blue-600';
+                else if (item.category === 'ppt') iconClass = 'fa-file-powerpoint text-orange-600';
+                else if (item.name.endsWith('.json')) iconClass = 'fa-file-code text-amber-600';
+
+                listHTML += `
+                    <div class="bg-slate-50 border border-slate-200 rounded-2xl p-3 flex items-center justify-between gap-3 group hover:border-blue-300 transition-all">
+                        <div class="flex items-center gap-3 overflow-hidden">
+                            <div class="w-10 h-10 bg-white rounded-xl border border-slate-200 flex items-center justify-center flex-shrink-0 shadow-sm">
+                                <i class="fa-solid ${iconClass}"></i>
+                            </div>
+                            <div class="overflow-hidden">
+                                <h4 class="text-xs font-bold text-slate-800 truncate">${item.name}</h4>
+                                <span class="text-[10px] text-slate-400">${item.size}</span>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-1 flex-shrink-0">
+                            <button onclick="moveFile(${index}, -1)" ${index === 0 ? 'disabled class="opacity-30 cursor-not-allowed"' : ''} class="w-7 h-7 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs flex items-center justify-center text-slate-600" title="تحريك لأعلى">
+                                <i class="fa-solid fa-arrow-up"></i>
+                            </button>
+                            <button onclick="moveFile(${index}, 1)" ${index === uploadedFiles.length - 1 ? 'disabled class="opacity-30 cursor-not-allowed"' : ''} class="w-7 h-7 bg-white border border-slate-200 hover:bg-slate-100 rounded-lg text-xs flex items-center justify-center text-slate-600" title="تحريك لأسفل">
+                                <i class="fa-solid fa-arrow-down"></i>
+                            </button>
+                            <button onclick="removeFile('${item.id}')" class="w-7 h-7 bg-red-50 hover:bg-red-100 rounded-lg text-xs flex items-center justify-center text-red-600" title="حذف">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            fileListContainer.innerHTML = listHTML;
+            renderPreview();
+        }
+
+        // Helper to build a full standalone Word-styled PDF sheet wrapper (1-inch style margins & formal header/footer)
+        function buildSheetWrapper(innerHTML, docTitle, sheetLabel) {
+            return `
+                <div class="pdf-sheet word-sheet-typography bg-white w-full min-h-[880px] shadow-xl rounded-sm border border-slate-200/80 px-10 py-12 sm:px-14 sm:py-14 flex flex-col justify-between">
+                    <div class="flex-grow flex flex-col">
+                        <div class="border-b-2 border-slate-300 pb-3 mb-7 flex justify-between items-end">
+                            <div>
+                                <h2 class="text-lg font-bold text-slate-900">${escapeHtml(docTitle)}</h2>
+                                <p class="text-[11px] text-slate-500 mt-0.5">${formattedTodayDate}</p>
+                            </div>
+                            <span class="text-[11px] font-semibold text-slate-500">${sheetLabel}</span>
+                        </div>
+                        <div class="flex-grow flex flex-col">
+                            ${innerHTML}
+                        </div>
+                    </div>
+                    <div class="border-t border-slate-200 pt-3 mt-8 flex justify-between items-center text-[11px] text-slate-500">
+                        <span>مجمع الملفات الذكي</span>
+                        <span>${sheetLabel}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Format plain text into clean, well-spaced Word-style paragraphs
+        function formatCleanTextParagraphs(rawText, fontSize, lineHeight) {
+            const lines = rawText.split(/\r?\n/);
+            return lines.map(line => {
+                const trimmed = line.trim();
+                if (!trimmed) {
+                    return `<div class="h-3.5"></div>`;
+                }
+                return `<p class="mb-3 text-justify text-slate-900 break-words" style="font-size: ${fontSize}; line-height: ${lineHeight};">${escapeHtml(trimmed)}</p>`;
+            }).join('');
+        }
+
+        function renderPreview() {
+            if (uploadedFiles.length === 0) return;
+
+            const currentFontSize = fontSizeSelect.value;
+            const currentLineHeight = lineHeightSelect.value;
+            const separateImages = separateImagePagesCheckbox.checked;
+            const docTitle = docTitleInput.value.trim() || 'تقرير الملفات المجمعة';
+
+            let sheetsHTML = '';
+            let bufferedBlocks = '';
+            let sheetCounter = 1;
+
+            const flushBufferedBlocks = () => {
+                if (bufferedBlocks.trim() !== '') {
+                    sheetsHTML += buildSheetWrapper(
+                        `<div class="flex flex-col gap-8">${bufferedBlocks}</div>`,
+                        docTitle,
+                        `صفحة / قسم ${sheetCounter++}`
+                    );
+                    bufferedBlocks = '';
+                }
+            };
+
+            uploadedFiles.forEach((item, index) => {
+                // Render each image on its own dedicated, full-page Word-style sheet when enabled
+                if (item.category === 'image' && separateImages) {
+                    flushBufferedBlocks();
+                    const imageSheetBody = `
+                        <div class="flex flex-col flex-grow justify-between h-full">
+                            <div class="mb-4 pb-2 border-b border-slate-200 flex items-center justify-between">
+                                <h3 class="text-sm font-bold text-slate-800">
+                                    ${index + 1}. ${escapeHtml(item.name)}
+                                </h3>
+                                <span class="text-[11px] text-slate-400">${item.size}</span>
+                            </div>
+                            <div class="flex-grow flex items-center justify-center p-2 my-auto">
+                                <img src="${item.content}" class="max-w-full max-h-[620px] object-contain border border-slate-200 p-1 bg-white">
+                            </div>
+                        </div>
+                    `;
+                    sheetsHTML += buildSheetWrapper(imageSheetBody, docTitle, `صفحة ${sheetCounter++}`);
+                    return;
+                }
+
+                // Build clean Word-like document section block
+                let blockHTML = `
+                    <div class="file-preview-block pb-6 border-b border-slate-200 last:border-b-0 last:pb-0">
+                        <div class="mb-4 pb-1.5 border-b border-slate-300 flex items-center justify-between">
+                            <h3 class="text-base font-bold text-slate-900">
+                                ${index + 1}. ${escapeHtml(item.name)}
+                            </h3>
+                        </div>
+                `;
+
+                if (item.category === 'image') {
+                    blockHTML += `
+                        <div class="flex justify-center py-3">
+                            <img src="${item.content}" class="max-h-[420px] object-contain border border-slate-200 p-1 bg-white">
+                        </div>
+                    `;
+                } else if (item.category === 'word') {
+                    blockHTML += `
+                        <div class="text-slate-900 text-justify [&>p]:mb-3.5 [&>h1]:text-xl [&>h1]:font-bold [&>h1]:mt-4 [&>h1]:mb-3 [&>h2]:text-lg [&>h2]:font-bold [&>h2]:mt-3.5 [&>h2]:mb-2.5 [&>h3]:font-bold [&>h3]:mt-3 [&>h3]:mb-2 [&>ul]:list-disc [&>ul]:pr-6 [&>ul]:mb-3 [&>ol]:list-decimal [&>ol]:pr-6 [&>ol]:mb-3 [&_li]:mb-1.5 [&>table]:w-full [&>table]:my-4 [&>table]:border-collapse [&_td]:border [&_td]:border-slate-400 [&_td]:p-2.5 [&_th]:border [&_th]:border-slate-400 [&_th]:p-2.5 [&_th]:bg-slate-100" style="font-size: ${currentFontSize}; line-height: ${currentLineHeight};">
+                            ${item.content}
+                        </div>
+                    `;
+                } else if (item.category === 'ppt') {
+                    blockHTML += `<div class="flex flex-col gap-5">`;
+                    item.content.forEach(slide => {
+                        const hasText = slide.paragraphs && slide.paragraphs.length > 0;
+                        const hasTables = slide.tables && slide.tables.length > 0;
+                        const hasImages = slide.images && slide.images.length > 0;
+                        const hasNotes = slide.notes && slide.notes.length > 0;
+
+                        let slideInner = '';
+                        if (hasText) {
+                            slideInner += slide.paragraphs.map((p, pIdx) => pIdx === 0
+                                ? `<p class="font-bold text-slate-950 mb-1.5">${escapeHtml(p)}</p>`
+                                : `<p>${escapeHtml(p)}</p>`
+                            ).join('');
+                        }
+                        if (hasTables) {
+                            slide.tables.forEach(tbl => {
+                                slideInner += `<table class="w-full my-3 border-collapse text-sm"><tbody>`;
+                                tbl.forEach((row, rIdx) => {
+                                    slideInner += `<tr>`;
+                                    row.forEach(cell => {
+                                        const tag = rIdx === 0 ? 'th' : 'td';
+                                        const bg = rIdx === 0 ? 'bg-slate-100 font-bold' : '';
+                                        slideInner += `<${tag} class="border border-slate-400 p-2 ${bg}">${escapeHtml(cell)}</${tag}>`;
+                                    });
+                                    slideInner += `</tr>`;
+                                });
+                                slideInner += `</tbody></table>`;
+                            });
+                        }
+                        if (hasImages) {
+                            slideInner += `<div class="grid grid-cols-1 gap-3 my-3">`;
+                            slide.images.forEach(imgSrc => {
+                                slideInner += `<div class="flex justify-center"><img src="${imgSrc}" class="max-h-[340px] object-contain border border-slate-200 p-1 bg-white"></div>`;
+                            });
+                            slideInner += `</div>`;
+                        }
+                        if (hasNotes) {
+                            slideInner += `
+                                <div class="mt-3 pt-2.5 border-t border-dashed border-slate-300 bg-slate-50/80 p-2.5 rounded text-slate-700 text-xs">
+                                    <span class="font-bold text-slate-800 block mb-1">ملاحظات الشريحة:</span>
+                                    ${slide.notes.map(n => `<p class="mb-1">${escapeHtml(n)}</p>`).join('')}
+                                </div>
+                            `;
+                        }
+                        if (!hasText && !hasTables && !hasImages && !hasNotes) {
+                            slideInner = `<p class="text-slate-400">(شريحة فارغة)</p>`;
+                        }
+
+                        blockHTML += `
+                            <div class="pr-4 border-r-2 border-slate-400 py-1">
+                                <div class="text-xs font-bold text-slate-600 mb-2">الشريحة (${slide.slideNumber})</div>
+                                <div class="space-y-2 text-slate-900 text-justify" style="font-size: ${currentFontSize}; line-height: ${currentLineHeight};">
+                                    ${slideInner}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    blockHTML += `</div>`;
+                } else {
+                    blockHTML += `
+                        <div>
+                            ${formatCleanTextParagraphs(item.content, currentFontSize, currentLineHeight)}
+                        </div>
+                    `;
+                }
+
+                blockHTML += `</div>`;
+                bufferedBlocks += blockHTML;
+            });
+
+            flushBufferedBlocks();
+            pdfPreviewArea.innerHTML = sheetsHTML;
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        // Export to PDF
+        async function triggerExportPDF() {
+            if (uploadedFiles.length === 0) return;
+
+            showToast('جاري إعداد وتصدير ملف الـ PDF...', 'info');
+            exportBtn.disabled = true;
+            exportBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> جاري التصدير...`;
+
+            const scrollContainer = document.getElementById('previewScrollContainer');
+            const sheets = document.querySelectorAll('#pdfPreviewArea .pdf-sheet');
+            const originalScrollTop = scrollContainer.scrollTop;
+
+            try {
+                // Temporarily expand scroll container so all sheets render cleanly at full scale
+                scrollContainer.scrollTop = 0;
+                scrollContainer.classList.remove('max-h-[750px]', 'overflow-y-auto');
+
+                await new Promise(resolve => setTimeout(resolve, 150));
+
+                const { jsPDF } = window.jspdf;
+                const selectedFormat = document.getElementById('pageSize').value || 'a4';
+                const pdf = new jsPDF('p', 'mm', selectedFormat);
+                const pdfWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+
+                let isFirstPdfPage = true;
+
+                // Process each sheet independently so standalone image sheets always start on a fresh PDF page
+                for (let sIndex = 0; sIndex < sheets.length; sIndex++) {
+                    const sheet = sheets[sIndex];
+                    sheet.classList.remove('shadow-xl', 'rounded-sm', 'border', 'border-slate-200/80');
+
+                    const canvas = await html2canvas(sheet, {
+                        scale: 2,
+                        useCORS: true,
+                        logging: false,
+                        windowHeight: sheet.scrollHeight,
+                        height: sheet.scrollHeight,
+                        y: 0
+                    });
+
+                    sheet.classList.add('shadow-xl', 'rounded-sm', 'border', 'border-slate-200/80');
+
+                    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                    let imgWidth = pdfWidth;
+                    let imgHeight = (canvas.height * pdfWidth) / canvas.width;
+
+                    if (!isFirstPdfPage) {
+                        pdf.addPage();
+                    }
+                    isFirstPdfPage = false;
+
+                    // If the sheet fits within a single PDF page (or slightly exceeds due to min-height), fit it cleanly on 1 page
+                    if (imgHeight <= pageHeight * 1.04) {
+                        if (imgHeight > pageHeight) {
+                            const ratio = pageHeight / imgHeight;
+                            imgHeight = pageHeight;
+                            imgWidth = pdfWidth * ratio;
+                        }
+                        const xOffset = (pdfWidth - imgWidth) / 2;
+                        pdf.addImage(imgData, 'JPEG', xOffset, 0, imgWidth, imgHeight);
+                    } else {
+                        // Multi-page slice for long Word / PowerPoint / Text sections
+                        let heightLeft = imgHeight;
+                        let position = 0;
+
+                        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+                        heightLeft -= pageHeight;
+
+                        while (heightLeft > 2) {
+                            position = heightLeft - imgHeight;
+                            pdf.addPage();
+                            pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight);
+                            heightLeft -= pageHeight;
+                        }
+                    }
+                }
+
+                const customTitle = docTitleInput.value.trim() || 'merged-document';
+                pdf.save(`${customTitle}.pdf`);
+                showToast('تم تصدير جميع الملفات بتنسيق احترافي!', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('حدث خطأ أثناء تصدير الملف', 'error');
+            } finally {
+                // Restore original preview UI styling
+                scrollContainer.classList.add('max-h-[750px]', 'overflow-y-auto');
+                sheets.forEach(s => s.classList.add('shadow-xl', 'rounded-sm', 'border', 'border-slate-200/80'));
+                scrollContainer.scrollTop = originalScrollTop;
+
+                exportBtn.disabled = false;
+                exportBtn.innerHTML = `<i class="fa-solid fa-file-pdf text-base"></i> تصدير إلى PDF`;
+            }
+        }
+
+        // Export to Word (.doc) with full RTL support, page breaks for standalone images, and clean formatting
+        async function triggerExportWord() {
+            if (uploadedFiles.length === 0) return;
+
+            showToast('جاري تجهيز وتصدير ملف Word...', 'info');
+            exportWordBtn.disabled = true;
+            exportWordBtn.innerHTML = `<i class="fa-solid fa-spinner fa-spin"></i> جاري التصدير...`;
+
+            try {
+                const docTitle = escapeHtml(docTitleInput.value.trim() || 'تقرير الملفات المجمعة');
+                const currentFontSize = fontSizeSelect.value || '15px';
+                const currentLineHeight = lineHeightSelect.value || '1.8';
+                const separateImages = separateImagePagesCheckbox.checked;
+                const selectedPageSize = document.getElementById('pageSize').value || 'a4';
+                const pageDimensions = selectedPageSize === 'letter' ? '21.59cm 27.94cm' : '21cm 29.7cm';
+
+                let wordSectionsHTML = '';
+
+                uploadedFiles.forEach((item, index) => {
+                    const isFirst = index === 0;
+                    const pageBreakBefore = (item.category === 'image' && separateImages && !isFirst)
+                        ? `<br clear="all" style="page-break-before:always; mso-break-type:section-break">`
+                        : '';
+                    const pageBreakAfter = (item.category === 'image' && separateImages && index < uploadedFiles.length - 1)
+                        ? `<br clear="all" style="page-break-before:always; mso-break-type:section-break">`
+                        : '';
+
+                    if (item.category === 'image') {
+                        wordSectionsHTML += `
+                            ${pageBreakBefore}
+                            <div style="margin-bottom: 18pt; text-align: center;">
+                                <h3 style="text-align: right; font-size: 13pt; font-weight: bold; color: #1e293b; border-bottom: 1pt solid #cbd5e1; padding-bottom: 4pt; margin-bottom: 12pt;">
+                                    ${index + 1}. ${escapeHtml(item.name)}
+                                </h3>
+                                <p style="text-align: center; margin: 12pt 0;">
+                                    <img src="${item.content}" style="max-width: 15.5cm; max-height: 21cm; height: auto; width: auto;" />
+                                </p>
+                            </div>
+                            ${pageBreakAfter}
+                        `;
+                    } else if (item.category === 'word') {
+                        wordSectionsHTML += `
+                            <div style="margin-bottom: 20pt;">
+                                <h3 style="font-size: 13pt; font-weight: bold; color: #1e293b; border-bottom: 1pt solid #cbd5e1; padding-bottom: 4pt; margin-bottom: 10pt;">
+                                    ${index + 1}. ${escapeHtml(item.name)}
+                                </h3>
+                                <div style="font-size: ${currentFontSize}; line-height: ${currentLineHeight}; text-align: justify;">
+                                    ${item.content}
+                                </div>
+                            </div>
+                        `;
+                    } else if (item.category === 'ppt') {
+                        let slidesHTML = '';
+                        item.content.forEach(slide => {
+                            const hasText = slide.paragraphs && slide.paragraphs.length > 0;
+                            const hasTables = slide.tables && slide.tables.length > 0;
+                            const hasImages = slide.images && slide.images.length > 0;
+                            const hasNotes = slide.notes && slide.notes.length > 0;
+
+                            let wordSlideBody = '';
+                            if (hasText) {
+                                wordSlideBody += slide.paragraphs.map((p, pIdx) => pIdx === 0
+                                    ? `<p style="font-weight: bold; color: #0f172a; margin-bottom: 4pt;">${escapeHtml(p)}</p>`
+                                    : `<p style="margin-bottom: 4pt;">${escapeHtml(p)}</p>`
+                                ).join('');
+                            }
+                            if (hasTables) {
+                                slide.tables.forEach(tbl => {
+                                    wordSlideBody += `<table><tbody>`;
+                                    tbl.forEach((row, rIdx) => {
+                                        wordSlideBody += `<tr>`;
+                                        row.forEach(cell => {
+                                            const tag = rIdx === 0 ? 'th' : 'td';
+                                            wordSlideBody += `<${tag}>${escapeHtml(cell)}</${tag}>`;
+                                        });
+                                        wordSlideBody += `</tr>`;
+                                    });
+                                    wordSlideBody += `</tbody></table>`;
+                                });
+                            }
+                            if (hasImages) {
+                                slide.images.forEach(imgSrc => {
+                                    wordSlideBody += `<p style="text-align: center; margin: 8pt 0;"><img src="${imgSrc}" style="max-width: 14cm; max-height: 16cm; height: auto; width: auto;" /></p>`;
+                                });
+                            }
+                            if (hasNotes) {
+                                wordSlideBody += `
+                                    <div style="margin-top: 6pt; padding: 6pt; background-color: #f8fafc; border: 0.5pt solid #cbd5e1; font-size: 10pt; color: #334155;">
+                                        <p style="font-weight: bold; margin-bottom: 3pt;">ملاحظات الشريحة:</p>
+                                        ${slide.notes.map(n => `<p style="margin-bottom: 2pt;">${escapeHtml(n)}</p>`).join('')}
+                                    </div>
+                                `;
+                            }
+
+                            slidesHTML += `
+                                <div style="margin-bottom: 14pt; padding-right: 10pt; border-right: 2pt solid #94a3b8;">
+                                    <p style="font-size: 10pt; font-weight: bold; color: #475569; margin-bottom: 4pt;">الشريحة (${slide.slideNumber})</p>
+                                    ${wordSlideBody || '<p>(شريحة فارغة)</p>'}
+                                </div>
+                            `;
+                        });
+                        wordSectionsHTML += `
+                            <div style="margin-bottom: 20pt;">
+                                <h3 style="font-size: 13pt; font-weight: bold; color: #1e293b; border-bottom: 1pt solid #cbd5e1; padding-bottom: 4pt; margin-bottom: 10pt;">
+                                    ${index + 1}. ${escapeHtml(item.name)}
+                                </h3>
+                                <div style="font-size: ${currentFontSize}; line-height: ${currentLineHeight}; text-align: justify;">
+                                    ${slidesHTML}
+                                </div>
+                            </div>
+                        `;
+                    } else {
+                        const paragraphsHTML = item.content.split(/\r?\n/).map(line => {
+                            const trimmed = line.trim();
+                            if (!trimmed) return `<p style="margin-bottom: 6pt;">&nbsp;</p>`;
+                            return `<p style="margin-bottom: 8pt; text-align: justify; font-size: ${currentFontSize}; line-height: ${currentLineHeight};">${escapeHtml(trimmed)}</p>`;
+                        }).join('');
+
+                        wordSectionsHTML += `
+                            <div style="margin-bottom: 20pt;">
+                                <h3 style="font-size: 13pt; font-weight: bold; color: #1e293b; border-bottom: 1pt solid #cbd5e1; padding-bottom: 4pt; margin-bottom: 10pt;">
+                                    ${index + 1}. ${escapeHtml(item.name)}
+                                </h3>
+                                ${paragraphsHTML}
+                            </div>
+                        `;
+                    }
+                });
+
+                const wordDocumentHTML = `
+                    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+                          xmlns:w="urn:schemas-microsoft-com:office:word"
+                          xmlns="http://www.w3.org/TR/REC-html40"
+                          dir="rtl" lang="ar">
+                    <head>
+                        <meta charset="utf-8">
+                        <title>${docTitle}</title>
+                        <!--[if gte mso 9]>
+                        <xml>
+                            <w:WordDocument>
+                                <w:View>Print</w:View>
+                                <w:Zoom>100</w:Zoom>
+                                <w:DoNotOptimizeForBrowser/>
+                            </w:WordDocument>
+                        </xml>
+                        <![endif]-->
+                        <style>
+                            @page Section1 {
+                                size: ${pageDimensions};
+                                margin: 2.54cm 2.54cm 2.54cm 2.54cm;
+                                mso-header-margin: 1.27cm;
+                                mso-footer-margin: 1.27cm;
+                                mso-paper-source: 0;
+                            }
+                            div.Section1 {
+                                page: Section1;
+                                direction: rtl;
+                                font-family: 'Cairo', 'Traditional Arabic', 'Arial', sans-serif;
+                                color: #1e293b;
+                            }
+                            table {
+                                border-collapse: collapse;
+                                width: 100%;
+                                margin: 10pt 0;
+                            }
+                            td, th {
+                                border: 1pt solid #94a3b8;
+                                padding: 6pt;
+                                text-align: right;
+                            }
+                            th {
+                                background-color: #f1f5f9;
+                                font-weight: bold;
+                            }
+                        </style>
+                    </head>
+                    <body dir="rtl" style="font-family: 'Cairo', 'Traditional Arabic', Arial, sans-serif;">
+                        <div class="Section1">
+                            <div style="border-bottom: 1.5pt solid #94a3b8; padding-bottom: 8pt; margin-bottom: 18pt;">
+                                <h1 style="font-size: 18pt; font-weight: bold; color: #0f172a; margin: 0;">${docTitle}</h1>
+                                <p style="font-size: 10pt; color: #64748b; margin: 4pt 0 0 0;">${formattedTodayDate}</p>
+                            </div>
+                            ${wordSectionsHTML}
+                        </div>
+                    </body>
+                    </html>
+                `;
+
+                const blob = new Blob(['\ufeff', wordDocumentHTML], {
+                    type: 'application/msword;charset=utf-8'
+                });
+
+                const customTitle = docTitleInput.value.trim() || 'merged-document';
+                const downloadLink = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                downloadLink.href = url;
+                downloadLink.download = `${customTitle}.doc`;
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                URL.revokeObjectURL(url);
+
+                showToast('تم تصدير المستند بصيغة Word بنجاح!', 'success');
+            } catch (error) {
+                console.error(error);
+                showToast('حدث خطأ أثناء تصدير ملف Word', 'error');
+            } finally {
+                exportWordBtn.disabled = false;
+                exportWordBtn.innerHTML = `<i class="fa-solid fa-file-word text-base"></i> تصدير إلى Word`;
+            }
+        }
+
+        // Toast Helper
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            const toastMessage = document.getElementById('toastMessage');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMessage.innerText = message;
+            if (type === 'success') {
+                toastIcon.className = 'fa-solid fa-circle-check text-emerald-400 text-lg';
+            } else if (type === 'info') {
+                toastIcon.className = 'fa-solid fa-circle-info text-blue-400 text-lg';
+            } else if (type === 'error') {
+                toastIcon.className = 'fa-solid fa-circle-exclamation text-red-400 text-lg';
+            }
+
+            toast.classList.remove('translate-y-24', 'opacity-0');
+            setTimeout(() => {
+                toast.classList.add('translate-y-24', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

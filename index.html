@@ -211,8 +211,134 @@
 
         // DOM Elements
         const fileInput = document.getElementById('fileInput');
+        const dropzone = document.getElementById('dropzone');
         const fileListContainer = document.getElementById('fileListContainer');
         const emptyFilesState = document.getElementById('emptyFilesState');
+        const fileCountBadge = document.getElementById('fileCountBadge');
+        const exportBtn = document.getElementById('exportBtn');
+        const exportWordBtn = document.getElementById('exportWordBtn');
+        const pdfPreviewArea = document.getElementById('pdfPreviewArea');
+        const docTitleInput = document.getElementById('docTitle');
+        const pageSizeSelect = document.getElementById('pageSize');
+        const fontSizeSelect = document.getElementById('fontSize');
+        const lineHeightSelect = document.getElementById('lineHeight');
+        const separateImagePagesCheckbox = document.getElementById('separateImagePages');
+        const previewDateStr = document.getElementById('previewDateStr');
+
+        // Format today's date in Arabic
+        const formattedTodayDate = new Date().toLocaleDateString('ar-EG', {
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        });
+        if (previewDateStr) {
+            previewDateStr.innerText = formattedTodayDate;
+        }
+
+        // Event Listeners for File Upload & Drag-and-Drop
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files && e.target.files.length > 0) {
+                handleFiles(e.target.files);
+                fileInput.value = ''; // Reset input so same file can be re-selected if needed
+            }
+        });
+
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('border-blue-500', 'bg-blue-50/40');
+        });
+
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('border-blue-500', 'bg-blue-50/40');
+        });
+
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('border-blue-500', 'bg-blue-50/40');
+            if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+                handleFiles(e.dataTransfer.files);
+            }
+        });
+
+        // Live Settings Listeners
+        docTitleInput.addEventListener('input', () => {
+            if (uploadedFiles.length === 0) updateUI();
+            else renderPreview();
+        });
+        pageSizeSelect.addEventListener('change', renderPreview);
+        fontSizeSelect.addEventListener('change', renderPreview);
+        lineHeightSelect.addEventListener('change', renderPreview);
+        separateImagePagesCheckbox.addEventListener('change', renderPreview);
+
+        // Process Uploaded Files
+        async function handleFiles(filesList) {
+            const files = Array.from(filesList);
+            if (files.length === 0) return;
+
+            showToast('جاري معالجة الملفات المرفوعة...', 'info');
+            let addedCount = 0;
+
+            for (const file of files) {
+                try {
+                    const lowerName = file.name.toLowerCase();
+                    const fileId = Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+                    let category = 'text';
+                    let content = '';
+
+                    if (file.type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(lowerName)) {
+                        category = 'image';
+                        content = await readAsDataURL(file);
+                    } else if (lowerName.endsWith('.docx')) {
+                        category = 'word';
+                        content = await readDocxHtml(file);
+                    } else if (lowerName.endsWith('.pptx')) {
+                        category = 'ppt';
+                        content = await readPptxSlides(file);
+                    } else if (lowerName.endsWith('.doc') || lowerName.endsWith('.ppt')) {
+                        showToast(`يرجى تحويل "${file.name}" إلى صيغة حديثة (.docx أو .pptx)`, 'error');
+                        continue;
+                    } else {
+                        category = 'text';
+                        content = await readAsText(file);
+                    }
+
+                    uploadedFiles.push({
+                        id: fileId,
+                        name: file.name,
+                        size: formatBytes(file.size),
+                        category: category,
+                        content: content
+                    });
+                    addedCount++;
+                } catch (err) {
+                    console.error('Error processing file:', file.name, err);
+                    showToast(`تعذر قراءة الملف: ${file.name}`, 'error');
+                }
+            }
+
+            if (addedCount > 0) {
+                updateUI();
+                showToast(`تمت إضافة ${addedCount} ملف بنجاح`, 'success');
+            }
+        }
+
+        // Read file as ArrayBuffer (for Mammoth & JSZip)
+        function readAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // Extract Word (.docx) content as clean HTML using Mammoth.js
+        async function readDocxHtml(file) {
+            const arrayBuffer = await readAsArrayBuffer(file);
+            const result = await mammoth.convertToHtml({ arrayBuffer: arrayBuffer });
+            return result.value || '<p>(مستند فارغ)</p>';
+        }
+
         // Extract PowerPoint (.pptx) slides text, tables, notes & embedded images (including NotebookLM decks)
         async function readPptxSlides(file) {
             const arrayBuffer = await readAsArrayBuffer(file);
